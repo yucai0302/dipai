@@ -1,0 +1,1486 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#F2EDE3" />
+<title>底牌 · 翻牌议价</title>
+<style>
+  :root {
+    --paper: #F2EDE3;
+    --paper-2: #FBF7EF;
+    --ink: #17140F;
+    --ink-2: #3D362C;
+    --muted: #8B8272;
+    --line: #D8D0C0;
+    --vermilion: #B03A2B;
+    --gold: #9E7B3C;
+    --indigo: #3B5468;
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; }
+  body {
+    min-height: 100dvh;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    opacity: .55;
+    mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/></filter><rect width='160' height='160' filter='url(%23n)' opacity='0.22'/></svg>");
+  }
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background: radial-gradient(120% 90% at 50% 0%, rgba(255,255,255,.55), transparent 60%),
+                radial-gradient(100% 80% at 50% 100%, rgba(120,95,60,.10), transparent 65%);
+  }
+
+  main {
+    position: relative;
+    z-index: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 26px 18px 64px;
+  }
+
+  /* ---------- 页眉 ---------- */
+  .masthead {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    padding-bottom: 14px;
+    margin-bottom: 26px;
+    border-bottom: 1px solid var(--ink);
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand-mark {
+    width: 12px; height: 12px;
+    background: var(--vermilion);
+    flex: none;
+    transform: translateY(-2px);
+  }
+  .brand h1 {
+    margin: 0;
+    font-size: 19px;
+    font-weight: 600;
+    letter-spacing: .34em;
+    text-indent: .34em;
+    line-height: 1.2;
+  }
+  .brand .sub {
+    margin: 5px 0 0;
+    font-size: 10px;
+    letter-spacing: .18em;
+    color: var(--muted);
+  }
+  .rounds { display: flex; gap: 5px; padding-bottom: 4px; }
+  .rounds i {
+    display: block;
+    width: 20px; height: 3px;
+    background: var(--line);
+    transition: background .35s;
+  }
+  .rounds i.on { background: var(--ink); }
+
+  /* ---------- 设置 ---------- */
+  .setup { max-width: 520px; margin: 6vh auto 0; }
+  .kicker { font-size: 10px; letter-spacing: .3em; color: var(--muted); }
+  .setup h2 {
+    margin: 12px 0 10px;
+    font-size: 27px;
+    font-weight: 600;
+    letter-spacing: .04em;
+  }
+  .setup .desc {
+    margin: 0 0 22px;
+    font-size: 12.5px;
+    line-height: 1.8;
+    color: var(--muted);
+  }
+  .setup-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    max-width: 430px;
+    margin: 0 auto;
+  }
+  .setup-card {
+    position: relative;
+    aspect-ratio: 3 / 4;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 18px 9px 12px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: linear-gradient(158deg, #FDFAF2 0%, #F3EDE0 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), 0 3px 12px rgba(70, 55, 30, .07);
+    cursor: text;
+    transition: transform .24s ease, box-shadow .24s ease, border-color .24s ease;
+    animation: deal .45s cubic-bezier(.2, .8, .3, 1) backwards;
+    animation-delay: calc(var(--i) * 34ms);
+  }
+  .setup-card::after {
+    content: "";
+    position: absolute;
+    inset: 5px;
+    border: 1px solid rgba(23, 20, 15, .07);
+    border-radius: 3px;
+    pointer-events: none;
+  }
+  .setup-card:hover {
+    transform: translateY(-3px);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), 0 8px 20px rgba(70, 55, 30, .11);
+  }
+  .setup-card:focus-within {
+    border-color: var(--ink);
+    transform: translateY(-3px);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), 0 10px 26px rgba(70, 55, 30, .15);
+  }
+  .sc-index {
+    position: absolute;
+    top: 8px;
+    left: 9px;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 9px;
+    letter-spacing: .08em;
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+  }
+  .setup-card.is-richest .sc-index { color: var(--vermilion); }
+  .setup-card .sc-val {
+    width: 100%;
+    max-height: 100%;
+    overflow: hidden;
+    padding: 0;
+    outline: none;
+    cursor: text;
+  }
+  .setup-card .sc-val:empty::before {
+    content: attr(data-ph);
+    font-size: 18px;
+    color: var(--line);
+  }
+  .setup-card .sc-val::selection { background: rgba(176, 58, 43, .16); }
+  .setup-hint {
+    display: flex;
+    justify-content: space-between;
+    max-width: 430px;
+    margin: 11px auto 0;
+    font-size: 10px;
+    letter-spacing: .16em;
+    color: var(--muted);
+  }
+  .setup-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    margin-top: 16px;
+  }
+  .counter { font-size: 12px; letter-spacing: .1em; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .counter.bad { color: var(--vermilion); }
+
+  /* ---------- 按钮 ---------- */
+  .btn {
+    appearance: none;
+    border: 1px solid var(--ink);
+    background: transparent;
+    color: var(--ink);
+    padding: 12px 22px;
+    border-radius: 2px;
+    font-family: inherit;
+    font-size: 13px;
+    letter-spacing: .12em;
+    cursor: pointer;
+    transition: background .22s, color .22s, transform .15s, border-color .22s, opacity .2s;
+  }
+  .btn:hover { transform: translateY(-1px); }
+  .btn:active { transform: translateY(0); }
+  .btn.primary { background: var(--ink); color: var(--paper); }
+  .btn.primary:hover { background: #2C261D; }
+  .btn.ghost { border-color: var(--line); color: var(--ink-2); }
+  .btn.ghost:hover { border-color: var(--ink-2); }
+  .btn[disabled] { opacity: .32; cursor: not-allowed; transform: none; }
+  .btn-row { display: flex; flex-wrap: wrap; gap: 10px; }
+
+  /* ---------- 布局 ---------- */
+  .layout { display: grid; gap: 30px; }
+  .board-wrap { max-width: 430px; margin: 0 auto; width: 100%; }
+  .side { display: flex; flex-direction: column; gap: 26px; }
+  .panel { padding-top: 20px; border-top: 1px solid var(--line); min-height: 186px; }
+  @media (min-width: 760px) {
+    .layout { grid-template-columns: minmax(0, 430px) minmax(0, 1fr); gap: 44px; align-items: start; }
+    .board-wrap { margin: 0; }
+  }
+
+  /* ---------- 棋盘 ---------- */
+  .board {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    user-select: none;
+  }
+  .card {
+    position: relative;
+    aspect-ratio: 3 / 4;
+    padding: 0;
+    border: 0;
+    background: none;
+    perspective: 1000px;
+    cursor: default;
+    animation: deal .5s cubic-bezier(.2, .8, .3, 1) backwards;
+    animation-delay: calc(var(--i) * 42ms);
+  }
+  @keyframes deal {
+    from { opacity: 0; transform: translateY(16px) scale(.95); }
+    to { opacity: 1; transform: none; }
+  }
+  .card.selectable { cursor: pointer; transition: transform .22s ease; }
+  .card.selectable:hover { transform: translateY(-5px); }
+  .card.selectable:active { transform: translateY(-2px) scale(.98); }
+
+  .card-inner {
+    position: absolute;
+    inset: 0;
+    transform-style: preserve-3d;
+    transition: transform .68s cubic-bezier(.22, .8, .25, 1);
+  }
+  .card.is-flipped .card-inner { transform: rotateY(180deg); }
+
+  .face {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border-radius: 7px;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+  .back {
+    background: #1C1813;
+    box-shadow: inset 0 0 0 1px rgba(244, 234, 216, .10), 0 2px 7px rgba(0, 0, 0, .18);
+    transition: box-shadow .4s;
+  }
+  .back::before {
+    content: "";
+    position: absolute;
+    inset: 6px;
+    border: 1px solid rgba(244, 234, 216, .14);
+    border-radius: 3px;
+  }
+  .back::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+      repeating-linear-gradient(45deg, rgba(244, 234, 216, .05) 0 1px, transparent 1px 8px),
+      repeating-linear-gradient(-45deg, rgba(244, 234, 216, .05) 0 1px, transparent 1px 8px);
+  }
+  .front {
+    flex-direction: column;
+    background: linear-gradient(158deg, #FDFAF2 0%, #F3EDE0 100%);
+    border: 1px solid var(--line);
+    transform: rotateY(180deg);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), 0 3px 12px rgba(70, 55, 30, .09);
+  }
+  .front::after {
+    content: "";
+    position: absolute;
+    inset: 5px;
+    border: 1px solid rgba(23, 20, 15, .07);
+    border-radius: 3px;
+    pointer-events: none;
+  }
+
+  .seal {
+    position: absolute;
+    width: 30%;
+    aspect-ratio: 1;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--gold);
+    border-radius: 2px;
+    color: var(--gold);
+    font-size: 12px;
+    letter-spacing: .06em;
+    opacity: 0;
+    transform: scale(.55);
+    transition: opacity .3s, transform .38s cubic-bezier(.2, 1.5, .4, 1);
+  }
+  .card.is-base .back {
+    box-shadow: inset 0 0 0 1.5px var(--gold), 0 0 0 2px rgba(158, 123, 60, .18), 0 3px 12px rgba(0, 0, 0, .2);
+  }
+  .card.is-base .seal { opacity: 1; transform: none; }
+  .card.is-base-b .back {
+    box-shadow: inset 0 0 0 1.5px var(--indigo), 0 0 0 2px rgba(59, 84, 104, .16), 0 3px 12px rgba(0, 0, 0, .2);
+  }
+  .card.is-base-b .seal {
+    opacity: 1;
+    transform: none;
+    border-color: var(--indigo);
+    color: var(--indigo);
+  }
+
+  /* 翻开后也能认出哪张是底牌 */
+  .front-tag {
+    position: absolute;
+    top: 7px;
+    left: 9px;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 11px;
+    letter-spacing: .06em;
+    opacity: 0;
+  }
+  .card.is-base .front-tag { opacity: 1; color: var(--gold); }
+  .card.is-base-b .front-tag { opacity: 1; color: var(--indigo); }
+
+  .val {
+    padding: 0 9px;
+    font-family: Georgia, "Times New Roman", "Songti SC", serif;
+    line-height: 1.16;
+    text-align: center;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    color: var(--ink);
+  }
+  .val.xl { font-size: clamp(21px, 6.6vw, 34px); }
+  .val.md { font-size: clamp(15px, 4.4vw, 21px); }
+  .val.sm { font-size: clamp(11px, 3.2vw, 14px); }
+
+  /* ---------- 洗牌 ---------- */
+  .shuffle-stage {
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    background: radial-gradient(85% 65% at 50% 42%, #FBF7EF 0%, var(--paper) 72%);
+    animation: fade .18s ease;
+  }
+  .shuffle-label {
+    position: fixed;
+    left: 50%;
+    top: calc(50% + 96px);
+    margin: 0;
+    transform: translateX(-50%);
+    font-size: 10px;
+    letter-spacing: .42em;
+    text-indent: .42em;
+    color: var(--muted);
+  }
+  .shuffle-ghost {
+    position: fixed !important;
+    left: 0;
+    top: 0;
+    inset: auto;
+    border-radius: 7px;
+    pointer-events: none;
+    will-change: transform;
+  }
+
+  .foot {
+    margin: 16px 0 0;
+    text-align: center;
+    font-size: 11px;
+    letter-spacing: .14em;
+    color: var(--muted);
+  }
+
+  /* ---------- 面板 ---------- */
+  .role {
+    display: inline-block;
+    padding: 3px 8px 2px;
+    border: 1px solid var(--vermilion);
+    border-radius: 2px;
+    color: var(--vermilion);
+    font-size: 10px;
+    letter-spacing: .22em;
+  }
+  .panel h2 {
+    margin: 14px 0 9px;
+    font-size: 21px;
+    font-weight: 600;
+    letter-spacing: .02em;
+    line-height: 1.4;
+  }
+  .panel p {
+    margin: 0 0 20px;
+    font-size: 12.5px;
+    line-height: 1.8;
+    color: var(--muted);
+  }
+  .offer {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin: 4px 0 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--line);
+  }
+  .offer-price {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: clamp(34px, 9vw, 44px);
+    line-height: 1;
+    font-variant-numeric: lining-nums;
+  }
+  .offer-unit { font-size: 11px; letter-spacing: .2em; color: var(--muted); }
+
+  .bid-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--ink);
+  }
+  .bid-label { font-size: 11px; letter-spacing: .2em; color: var(--muted); flex: none; }
+  .bid-row input {
+    flex: 1;
+    width: 100%;
+    min-width: 0;
+    border: 0;
+    background: transparent;
+    color: var(--ink);
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 32px;
+    line-height: 1.2;
+    outline: none;
+    padding: 0;
+  }
+  .bid-row input::placeholder { color: var(--line); }
+  .bid-row input::-webkit-outer-spin-button,
+  .bid-row input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .bid-row input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+
+  /* ---------- 价值池 ---------- */
+  .block-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 9px;
+    margin-bottom: 13px;
+    border-bottom: 1px solid var(--line);
+    font-size: 10px;
+    letter-spacing: .2em;
+    color: var(--muted);
+  }
+  .pool { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    padding: 5px 9px;
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    background: var(--paper-2);
+    font-family: Georgia, "Times New Roman", "Songti SC", serif;
+    font-size: 13px;
+    color: var(--ink-2);
+    animation: chipIn .28s ease backwards;
+  }
+  @keyframes chipIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: none; }
+  }
+  .pool-empty { font-size: 12px; color: var(--muted); }
+
+  /* ---------- 记录 ---------- */
+  .log { list-style: none; margin: 0; padding: 0; }
+  .log li {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 9px 0;
+    border-bottom: 1px dashed var(--line);
+    font-size: 12px;
+    color: var(--ink-2);
+  }
+  .log .r {
+    flex: none;
+    width: 30px;
+    font-family: Georgia, serif;
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+  }
+  .log .body { flex: 1; line-height: 1.6; }
+  .log .body b { font-weight: 600; }
+  .log .tag {
+    flex: none;
+    font-size: 10px;
+    letter-spacing: .12em;
+    padding: 2px 6px 1px;
+    border: 1px solid currentColor;
+    border-radius: 2px;
+  }
+  .tag.accept { color: var(--vermilion); }
+  .tag.reject { color: var(--muted); }
+  .tag.pass { color: var(--gold); }
+  .log-empty { font-size: 12px; color: var(--muted); padding: 8px 0; }
+
+  /* ---------- 结算 ---------- */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: grid;
+    place-items: center;
+    padding: 18px;
+    background: rgba(23, 20, 15, .55);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    animation: fade .3s ease;
+  }
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+  .result {
+    position: relative;
+    width: 100%;
+    max-width: 400px;
+    padding: 34px 26px 26px;
+    border-radius: 3px;
+    background: var(--paper-2);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, .38);
+    animation: rise .5s cubic-bezier(.2, .8, .3, 1);
+  }
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(26px) scale(.97); }
+    to { opacity: 1; transform: none; }
+  }
+  .stamp {
+    position: absolute;
+    top: 24px;
+    right: 24px;
+    width: 54px;
+    height: 54px;
+    display: grid;
+    place-items: center;
+    border: 2px solid var(--vermilion);
+    border-radius: 3px;
+    color: var(--vermilion);
+    font-size: 12px;
+    letter-spacing: .06em;
+    transform: rotate(-9deg);
+    opacity: .85;
+    animation: stampIn .42s cubic-bezier(.2, 1.5, .4, 1) .32s backwards;
+  }
+  @keyframes stampIn {
+    from { opacity: 0; transform: rotate(-9deg) scale(2.4); }
+    to { opacity: .85; transform: rotate(-9deg) scale(1); }
+  }
+  .res-kicker { margin: 0; font-size: 10px; letter-spacing: .3em; color: var(--muted); }
+  .res-label { margin: 20px 0 2px; font-size: 10px; letter-spacing: .22em; color: var(--muted); }
+  .res-price {
+    margin: 0 0 22px;
+    font-family: Georgia, "Times New Roman", "Songti SC", serif;
+    font-size: clamp(38px, 11vw, 54px);
+    line-height: 1.15;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+  .res-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+  }
+  .res-grid.single { grid-template-columns: 1fr; }
+  .res-grid span { display: block; margin-bottom: 5px; font-size: 10px; letter-spacing: .18em; color: var(--muted); }
+  .res-grid strong { font-family: Georgia, "Times New Roman", serif; font-size: 19px; font-weight: 400; }
+  .res-grid strong.pos { color: var(--vermilion); }
+  .res-grid strong.neg { color: var(--ink); }
+  .res-line { margin: 18px 0 22px; font-size: 12.5px; line-height: 1.8; color: var(--ink-2); }
+  .res-actions { display: flex; gap: 10px; }
+  .res-actions .btn { flex: 1; text-align: center; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header class="masthead">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <div>
+        <h1>底牌</h1>
+        <p class="sub">九张牌 · 一次报价 · 一个决定</p>
+      </div>
+    </div>
+    <div class="rounds" id="rounds" aria-hidden="true"></div>
+  </header>
+
+  <section class="setup" id="setup">
+    <p class="kicker">SETUP</p>
+    <h2>写下九张牌</h2>
+    <p class="desc">九张牌就是九个候选，<b>按价格从低到高写</b>：越便宜的越靠上，第 9 张最贵。数字当作价格，文字当作物品（比如「手机」）；最后 A、B 比底牌大小，比的就是这个顺序。</p>
+    <div class="setup-grid" id="setupGrid" aria-label="九张牌的内容"></div>
+    <div class="setup-hint"><span>↑ 越靠上越便宜</span><span>越靠下越贵</span></div>
+    <div class="setup-foot">
+      <span class="counter" id="counter">9 / 9</span>
+      <button class="btn primary" id="startBtn">洗牌 · 开始</button>
+    </div>
+  </section>
+
+  <div class="layout" id="layout" hidden>
+    <section class="board-wrap">
+      <div class="board" id="board"></div>
+      <p class="foot" id="foot"></p>
+    </section>
+    <aside class="side">
+      <section class="pool-block">
+        <div class="block-head"><span>还没翻开的可能</span><span id="poolCount"></span></div>
+        <div class="pool" id="pool"></div>
+      </section>
+      <section class="panel" id="panel"></section>
+      <section class="log-block">
+        <div class="block-head"><span>过程</span></div>
+        <ol class="log" id="log"></ol>
+      </section>
+    </aside>
+  </div>
+</main>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="result" id="result"></div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var DEFAULTS = ['10', '50', '100', '200', '500', '800', '1000', '2000', '5000'];
+  var TOTAL = 9;
+  var FIRST_FLIP = 2;                                   // 第一轮翻两张
+  var KEEP_HIDDEN = 1;                                  // 留到最后、由 A 亲手翻开的那张（B 的底牌）
+  var POOL = TOTAL - 1;                                 // 去掉 A 的底牌后可翻的牌
+  var MAX_BATCH = 1 + (POOL - FIRST_FLIP - KEEP_HIDDEN); // 第一轮两张 + 之后每轮一张
+
+  var state = {
+    phase: 'setup',
+    values: [],
+    cards: [],
+    aBase: -1,
+    bBase: -1,
+    batch: 0,
+    need: 0,
+    finalFlip: false,
+    bids: [],
+    pending: null,
+    lastRevealed: [],
+    numeric: true
+  };
+  var shuffling = false;
+
+  var el = {
+    setup: document.getElementById('setup'),
+    setupGrid: document.getElementById('setupGrid'),
+    counter: document.getElementById('counter'),
+    startBtn: document.getElementById('startBtn'),
+    layout: document.getElementById('layout'),
+    board: document.getElementById('board'),
+    rounds: document.getElementById('rounds'),
+    foot: document.getElementById('foot'),
+    panel: document.getElementById('panel'),
+    pool: document.getElementById('pool'),
+    poolCount: document.getElementById('poolCount'),
+    log: document.getElementById('log'),
+    overlay: document.getElementById('overlay'),
+    result: document.getElementById('result')
+  };
+
+  /* ---------------- 工具 ---------------- */
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function isNumeric(v) {
+    return /^-?\d+(\.\d+)?$/.test(String(v).replace(/[,\s]/g, ''));
+  }
+
+  function num(v) {
+    return Number(String(v).replace(/[,\s]/g, ''));
+  }
+
+  function fmt(n) {
+    return Number(n).toLocaleString('zh-CN', { maximumFractionDigits: 2 });
+  }
+
+  function sizeClass(v) {
+    var len = String(v).length;
+    if (len <= 4) return 'xl';
+    if (len <= 7) return 'md';
+    return 'sm';
+  }
+
+  function shuffle(a) {
+    for (var i = a.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+
+  function flippedCount() {
+    var n = 0;
+    state.cards.forEach(function (c, i) {
+      if (c.revealed && !isBase(i)) n += 1;
+    });
+    return n;
+  }
+
+  function isBase(i) {
+    return i === state.aBase || i === state.bBase;
+  }
+
+  function aBaseValue() {
+    return state.cards[state.aBase] ? state.cards[state.aBase].value : '';
+  }
+
+  function poolValues() {
+    var counts = new Map();
+    state.values.forEach(function (v) { counts.set(v, (counts.get(v) || 0) + 1); });
+    state.cards.forEach(function (c) {
+      if (!c.revealed) return;
+      var n = counts.get(c.value);
+      if (n) counts.set(c.value, n - 1);
+    });
+    var out = [];
+    counts.forEach(function (n, v) {
+      for (var i = 0; i < n; i++) out.push(v);
+    });
+    // 按写下的价格顺序排（第 1 行最便宜），文字牌也照这个顺序
+    out.sort(function (a, b) {
+      return state.values.indexOf(a) - state.values.indexOf(b);
+    });
+    return out;
+  }
+
+  /* ---------------- 渲染 ---------------- */
+
+  function render() {
+    renderRounds();
+    renderFoot();
+    renderPool();
+    renderPanel();
+    renderLog();
+    focusBidIfNeeded();
+  }
+
+  function renderRounds() {
+    var html = '';
+    for (var i = 0; i < MAX_BATCH; i++) {
+      html += '<i class="' + (i < state.batch ? 'on' : '') + '"></i>';
+    }
+    el.rounds.innerHTML = html;
+  }
+
+  function renderFoot() {
+    if (state.phase === 'pickA') {
+      el.foot.textContent = '点一张，扣下来当 A 的底牌';
+    } else if (state.phase === 'setup') {
+      el.foot.textContent = '';
+    } else if (state.phase === 'reveal') {
+      if (state.finalFlip) {
+        el.foot.textContent = '翻开最后一张 · 它就是 B 的底牌';
+      } else {
+        el.foot.textContent = '本轮还要挑 ' + state.need + ' 张 · 已翻开 ' + flippedCount() + ' / ' + POOL;
+      }
+    } else {
+      el.foot.textContent = '已翻开 ' + flippedCount() + ' / ' + POOL + ' 张';
+    }
+  }
+
+  function renderPool() {
+    var list = poolValues();
+    el.poolCount.textContent = list.length ? list.length + ' 张' : '';
+    if (!list.length) {
+      el.pool.innerHTML = '<span class="pool-empty">全部翻开了</span>';
+      return;
+    }
+    el.pool.innerHTML = list.map(function (v) {
+      return '<span class="chip">' + esc(v) + '</span>';
+    }).join('');
+  }
+
+  function renderPanel() {
+    var html = '';
+    var p = state.phase;
+
+    if (p === 'pickA') {
+      html =
+        '<span class="role">A</span>' +
+        '<h2>选一张做底牌</h2>' +
+        '<p>牌已经打乱。点任意一张扣下来，它全程不见光，摊牌时和 B 的底牌比大小。</p>';
+    } else if (p === 'reveal') {
+      html =
+        '<span class="role">A</span>' +
+        '<h2>' + (state.finalFlip ? '翻开最后一张' : state.batch === 0 ? '挑两张翻开' : '再挑一张翻开') + '</h2>' +
+        '<p>' + (state.finalFlip
+          ? '只剩这一张了，也由你亲手翻开。它就是 B 的底牌，翻开后立刻摊牌比大小。'
+          : '第一轮翻两张，之后每轮只翻一张。最后一张同样由你翻开，翻完就摊牌。') + '</p>' +
+        '<div class="offer">' +
+          '<span class="offer-price">' + state.need + '</span>' +
+          '<span class="offer-unit">张待翻</span>' +
+        '</div>';
+    } else if (p === 'revealing') {
+      html =
+        '<span class="role">A</span>' +
+        '<h2>翻牌中</h2>' +
+        '<p>看清这几张，它们会左右 B 的判断。</p>';
+    } else if (p === 'bid') {
+      html =
+        '<span class="role">B</span>' +
+        '<h2>给底牌出个价</h2>' +
+        '<p>第 ' + state.batch + ' / ' + MAX_BATCH + ' 轮报价。已翻开 ' + flippedCount() + ' / ' + POOL + ' 张，底牌就藏在剩下的 ' + poolValues().length + ' 个可能里。</p>' +
+        '<div class="bid-row">' +
+          '<span class="bid-label">报价</span>' +
+          '<input id="bidInput" type="number" inputmode="decimal" step="any" min="0" placeholder="0" autocomplete="off" aria-label="报价" />' +
+        '</div>' +
+        '<div class="btn-row" style="margin-top:18px"><button class="btn primary" data-act="bid">确认报价</button></div>';
+    } else if (p === 'decide') {
+      var last = state.batch >= MAX_BATCH;
+      html =
+        '<span class="role">A</span>' +
+        '<h2>接受这个价格吗</h2>' +
+        '<div class="offer">' +
+          '<span class="offer-price">' + fmt(state.pending) + '</span>' +
+          '<span class="offer-unit">B 的报价</span>' +
+        '</div>' +
+        '<p>' + (last
+          ? '这是最后一次报价。不接受就翻开最后一张，摊牌比底牌大小。'
+          : '接受就当场成交、翻开底牌；不接受，再翻一张，B 重新报价。') + '</p>' +
+        '<div class="btn-row">' +
+          '<button class="btn primary" data-act="accept">接受 · 成交</button>' +
+          '<button class="btn ghost" data-act="reject">' + (last ? '不接受 · 翻最后一张' : '不接受 · 继续') + '</button>' +
+        '</div>';
+    } else {
+      html =
+        '<span class="role">结束</span>' +
+        '<h2>本局结束</h2>' +
+        '<p>A 的底牌是「' + esc(aBaseValue()) + '」。</p>' +
+        '<div class="btn-row">' +
+          '<button class="btn primary" data-act="restart">再来一局</button>' +
+          '<button class="btn ghost" data-act="setup">换一组牌</button>' +
+        '</div>';
+    }
+
+    el.panel.innerHTML = html;
+  }
+
+  function renderLog() {
+    if (!state.bids.length) {
+      el.log.innerHTML = '<li class="log-empty">还没有人报价</li>';
+      return;
+    }
+    var tagText = { accept: '成交', reject: '拒绝', pass: '摊牌' };
+    el.log.innerHTML = state.bids.map(function (b) {
+      var tag = b.decision
+        ? '<span class="tag ' + b.decision + '">' + tagText[b.decision] + '</span>'
+        : '';
+      return '<li>' +
+        '<span class="r">R' + b.round + '</span>' +
+        '<span class="body">翻开 ' + b.cards.map(esc).join(' · ') +
+        ' ｜ 报价 <b>' + fmt(b.price) + '</b></span>' + tag +
+        '</li>';
+    }).join('');
+  }
+
+  function focusBidIfNeeded() {
+    if (state.phase !== 'bid') return;
+    var input = document.getElementById('bidInput');
+    if (input && window.matchMedia('(pointer: fine)').matches) {
+      input.focus();
+    }
+  }
+
+  /* ---------------- 棋盘 ---------------- */
+
+  function buildBoard() {
+    el.board.innerHTML = '';
+    state.cards.forEach(function (card, i) {
+      var btn = document.createElement('button');
+      btn.className = 'card';
+      btn.type = 'button';
+      btn.dataset.i = String(i);
+      btn.style.setProperty('--i', String(i));
+      btn.setAttribute('aria-label', '第 ' + (i + 1) + ' 张牌');
+      btn.innerHTML =
+        '<div class="card-inner">' +
+          '<div class="face back"><span class="seal"></span></div>' +
+          '<div class="face front"><span class="front-tag"></span><span class="val ' + sizeClass(card.value) + '">' + esc(card.value) + '</span></div>' +
+        '</div>';
+      el.board.appendChild(btn);
+    });
+  }
+
+  function syncBoard() {
+    var nodes = el.board.children;
+    var pickA = state.phase === 'pickA';
+    var flipping = state.phase === 'reveal';
+
+    for (var i = 0; i < nodes.length; i++) {
+      var card = state.cards[i];
+      var live = pickA || (flipping && !card.revealed && !isBase(i));
+
+      nodes[i].classList.toggle('is-flipped', card.revealed);
+      nodes[i].classList.toggle('is-base', i === state.aBase);
+      nodes[i].classList.toggle('is-base-b', i === state.bBase);
+      nodes[i].classList.toggle('selectable', live);
+      nodes[i].disabled = !live;
+      var tag = i === state.aBase ? 'A' : i === state.bBase ? 'B' : '';
+      nodes[i].querySelector('.seal').textContent = tag;
+      nodes[i].querySelector('.front-tag').textContent = tag;
+    }
+  }
+
+  /* ---------------- 流程 ---------------- */
+
+  function startGame(values) {
+    prepareGame(values);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function prepareGame(values) {
+    state.values = values.slice();
+    state.cards = shuffle(values.map(function (v, rank) {
+      return { value: v, rank: rank, revealed: false };
+    }));
+    state.aBase = -1;
+    state.bBase = -1;
+    state.batch = 0;
+    state.need = 0;
+    state.finalFlip = false;
+    state.bids = [];
+    state.pending = null;
+    state.lastRevealed = [];
+    state.numeric = values.every(isNumeric);
+    state.phase = 'pickA';
+
+    el.setup.hidden = true;
+    el.layout.hidden = false;
+    el.overlay.hidden = true;
+
+    buildBoard();
+    syncBoard();
+    render();
+  }
+
+  /* ---------------- 洗牌动画 ---------------- */
+
+  function animDone(animation, fallbackMs) {
+    return new Promise(function (resolve) {
+      var done = false;
+      function finish() {
+        if (done) return;
+        done = true;
+        resolve();
+      }
+      animation.onfinish = finish;
+      animation.oncancel = finish;
+      if (fallbackMs) setTimeout(finish, fallbackMs);
+    });
+  }
+
+  function moveTo(node, x, y, rot, scale, dur, delay) {
+    var to = 'translate(' + x + 'px,' + y + 'px) rotate(' + rot + 'deg) scale(' + scale + ')';
+    var a = node.animate(
+      [{ transform: node.style.transform }, { transform: to }],
+      { duration: dur, delay: delay || 0, easing: 'cubic-bezier(.2,.8,.3,1)' }
+    );
+    return animDone(a, dur + (delay || 0) + 160).then(function () { node.style.transform = to; });
+  }
+
+  function arcTo(node, x, y, dir, dur, delay) {
+    var from = node.style.transform;
+    var mid = 'translate(' + x + 'px,' + (y - 34) + 'px) rotate(' + (dir * 8) + 'deg) scale(1)';
+    var to = 'translate(' + x + 'px,' + y + 'px) rotate(0deg) scale(1)';
+    var a = node.animate(
+      [{ transform: from }, { transform: mid, offset: .45 }, { transform: to }],
+      { duration: dur, delay: delay || 0, easing: 'ease-in-out' }
+    );
+    return animDone(a, dur + (delay || 0) + 160).then(function () { node.style.transform = to; });
+  }
+
+  function snapBoard() {
+    if (!el.board.getAnimations) return;
+    el.board.getAnimations({ subtree: true }).forEach(function (a) {
+      try { a.finish(); } catch (e) {}
+    });
+  }
+
+  function shuffleInto(values) {
+    var stage = document.createElement('div');
+    stage.className = 'shuffle-stage';
+
+    var label = document.createElement('p');
+    label.className = 'shuffle-label';
+    label.textContent = '洗 牌';
+    stage.appendChild(label);
+    document.body.appendChild(stage);
+    document.body.style.overflow = 'hidden';
+
+    var w = Math.min(104, Math.max(76, window.innerWidth * .24));
+    var h = w * 4 / 3;
+    var cx = window.innerWidth / 2;
+    var cy = window.innerHeight / 2;
+    var ghosts = [];
+
+    // 一叠牌，微错位像一摞
+    for (var i = 0; i < TOTAL; i++) {
+      var g = document.createElement('div');
+      g.className = 'face back shuffle-ghost';
+      g.style.width = w + 'px';
+      g.style.height = h + 'px';
+      g.style.transform =
+        'translate(' + (cx - w / 2 + i * 1.2) + 'px,' + (cy - h / 2 + i * 1.5) + 'px)' +
+        ' rotate(' + ((i - 4) * .35) + 'deg) scale(1)';
+      stage.appendChild(g);
+      ghosts.push(g);
+    }
+
+    stage.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 180, easing: 'ease' });
+
+    // 1. 切牌：分成左右两摞
+    var split = ghosts.map(function (g, i) {
+      var dir = i < 4 ? -1 : 1;
+      var k = i < 4 ? i : i - 4;
+      var x = cx - w / 2 + dir * (w * .62) + dir * k * 2;
+      var y = cy - h / 2 + k * 1.8;
+      return moveTo(g, x, y, dir * 2.5, 1, 290, i * 14);
+    });
+
+    return Promise.all(split).then(function () {
+      // 2. 交错插牌
+      var pairs = [];
+      for (var a = 0; a < 4; a++) pairs.push({ gi: a, slot: a * 2, dir: -1 });
+      for (var b = 0; b < 5; b++) pairs.push({ gi: 4 + b, slot: b * 2 + 1, dir: 1 });
+      return Promise.all(pairs.map(function (p) {
+        var x = cx - w / 2 + (p.slot - 4) * 1.6;
+        var y = cy - h / 2 + (p.slot - 4) * 2.1;
+        return arcTo(ghosts[p.gi], x, y, p.dir, 250, p.slot * 46);
+      }));
+    }).then(function () {
+      // 3. 收拢成一摞
+      label.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 200, easing: 'ease' });
+      return Promise.all(ghosts.map(function (g, i) {
+        return moveTo(g, cx - w / 2 + (i - 4) * .8, cy - h / 2 + (i - 4) * 1.1, 0, 1, 230, 0);
+      }));
+    }).then(function () {
+      // 4. 逐张落进棋盘
+      document.body.style.overflow = '';
+      window.scrollTo(0, 0);
+      prepareGame(values);
+      snapBoard();
+      var slots = Array.prototype.map.call(el.board.children, function (node) {
+        var r = node.getBoundingClientRect();
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width };
+      });
+      return Promise.all(ghosts.map(function (g, i) {
+        var s = slots[i] || { x: cx, y: cy, w: w };
+        return moveTo(g, s.x - w / 2, s.y - h / 2, 0, s.w / w, 420, i * 26);
+      }));
+    }).then(function () {
+      return animDone(stage.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 240, easing: 'ease' }), 420);
+    }).then(function () {
+      stage.remove();
+      document.body.style.overflow = '';
+    });
+  }
+
+  function beginGame(values) {
+    if (shuffling) return;
+    if (!Element.prototype.animate || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      startGame(values);
+      return;
+    }
+    shuffling = true;
+    el.startBtn.disabled = true;
+    shuffleInto(values).then(function () {
+      shuffling = false;
+      el.startBtn.disabled = false;
+    }, function () {
+      shuffling = false;
+      el.startBtn.disabled = false;
+      document.body.style.overflow = '';
+      startGame(values);
+    });
+  }
+
+  function pickABase(i) {
+    if (state.phase !== 'pickA' || i < 0 || i >= TOTAL) return;
+    state.aBase = i;
+    state.phase = 'reveal';
+    state.need = FIRST_FLIP;
+    state.lastRevealed = [];
+    syncBoard();
+    render();
+  }
+
+  function flipCard(i) {
+    if (state.phase !== 'reveal' || state.need <= 0) return;
+    if (isBase(i) || state.cards[i].revealed) return;
+
+    state.cards[i].revealed = true;
+    state.lastRevealed.push(i);
+    state.need -= 1;
+
+    if (state.need > 0) {
+      syncBoard();
+      render();
+      return;
+    }
+
+    var final = state.finalFlip;
+    if (final) state.bBase = i;   // 最后这一张由 A 翻开，翻开的这张就是 B 的底牌
+
+    state.phase = 'revealing';
+    syncBoard();
+    render();
+
+    setTimeout(function () {
+      if (final) {
+        state.finalFlip = false;
+        showdown();
+      } else {
+        state.batch += 1;
+        state.phase = 'bid';
+        render();
+      }
+    }, 780);
+  }
+
+  function submitBid() {
+    if (state.phase !== 'bid') return;
+    var input = document.getElementById('bidInput');
+    if (!input) return;
+    var raw = String(input.value).replace(/[,\s]/g, '');
+    var price = Number(raw);
+
+    if (raw === '' || !isFinite(price) || price <= 0) {
+      input.parentElement.animate(
+        [{ transform: 'translateX(0)' }, { transform: 'translateX(-6px)' },
+         { transform: 'translateX(6px)' }, { transform: 'translateX(0)' }],
+        { duration: 220, easing: 'ease-in-out' }
+      );
+      input.focus();
+      return;
+    }
+
+    var cardsThisRound = (state.lastRevealed || []).map(function (i) {
+      return state.cards[i].value;
+    });
+
+    state.pending = price;
+    state.bids.push({
+      round: state.batch,
+      cards: cardsThisRound,
+      price: price,
+      decision: null
+    });
+    state.phase = 'decide';
+    syncBoard();
+    render();
+  }
+
+  function accept() {
+    if (state.phase !== 'decide') return;
+    state.bids[state.bids.length - 1].decision = 'accept';
+    settle();
+  }
+
+  function reject() {
+    if (state.phase !== 'decide') return;
+    var last = state.bids[state.bids.length - 1];
+
+    if (state.batch >= MAX_BATCH) {
+      last.decision = 'pass';
+      state.pending = null;
+      state.lastRevealed = [];
+      state.need = 1;
+      state.finalFlip = true;
+      state.phase = 'reveal';
+      syncBoard();
+      render();
+      return;
+    }
+
+    last.decision = 'reject';
+    state.phase = 'reveal';
+    state.need = 1;
+    state.pending = null;
+    state.lastRevealed = [];
+    syncBoard();
+    render();
+  }
+
+  function settle() {
+    state.phase = 'deal';
+    state.cards[state.aBase].revealed = true;
+    syncBoard();
+    render();
+    setTimeout(function () { showResult(true); }, 760);
+  }
+
+  function showdown() {
+    state.phase = 'showdown';
+    state.cards[state.aBase].revealed = true;
+    syncBoard();
+    render();
+    setTimeout(function () { showResult(false); }, 900);
+  }
+
+  function showdownVerdict() {
+    var a = state.cards[state.aBase];
+    var b = state.cards[state.bBase];
+    if (a.value === b.value) return { winner: 'draw', line: '两张底牌一样大，流局，谁也不是赌王。' };
+    return a.rank > b.rank
+      ? { winner: 'A', line: 'A 的底牌更值钱，A 是本局赌王。' }
+      : { winner: 'B', line: 'B 的底牌更值钱，B 是本局赌王。' };
+  }
+
+  function showResult(deal) {
+    var aCard = state.cards[state.aBase];
+    var body = '';
+    var stamp = '';
+    var kicker = '';
+
+    if (deal) {
+      stamp = '成交';
+      kicker = 'DEAL';
+      var price = state.pending;
+      if (state.numeric) {
+        var diff = price - num(aCard.value);
+        var cls = diff > 0 ? 'pos' : diff < 0 ? 'neg' : '';
+        var line = diff > 0
+          ? 'A 比底牌多拿了 ' + fmt(diff) + '，B 出价高了。'
+          : diff < 0
+            ? 'A 比底牌少拿了 ' + fmt(-diff) + '，B 压价成功。'
+            : '价格和底牌刚好相等，谁也没赚。';
+        body =
+          '<div class="res-grid">' +
+            '<div><span>成交价</span><strong>' + fmt(price) + '</strong></div>' +
+            '<div><span>差额</span><strong class="' + cls + '">' +
+              (diff > 0 ? '+' : diff < 0 ? '−' : '') + fmt(Math.abs(diff)) + '</strong></div>' +
+          '</div>' +
+          '<p class="res-line">' + line + '</p>';
+      } else {
+        body =
+          '<div class="res-grid single">' +
+            '<div><span>成交价</span><strong>' + fmt(price) + '</strong></div>' +
+          '</div>' +
+          '<p class="res-line">A 以 ' + fmt(price) + ' 的价格，把「' + esc(aCard.value) + '」卖了。</p>';
+      }
+    } else {
+      var v = showdownVerdict();
+      var bCard = state.cards[state.bBase];
+      stamp = v.winner === 'draw' ? '流局' : '摊牌';
+      kicker = 'SHOWDOWN';
+      body =
+        '<div class="res-grid">' +
+          '<div><span>B 的底牌</span><strong>' + esc(bCard.value) + '</strong></div>' +
+          '<div><span>判定</span><strong class="' + (v.winner === 'draw' ? '' : 'pos') + '">' +
+            (v.winner === 'draw' ? '平手' : v.winner + ' 胜') + '</strong></div>' +
+        '</div>' +
+        '<p class="res-line">' + v.line + '</p>';
+    }
+
+    el.result.innerHTML =
+      '<div class="stamp">' + stamp + '</div>' +
+      '<p class="res-kicker">' + kicker + '</p>' +
+      '<p class="res-label">A 的底牌</p>' +
+      '<div class="res-price">' + esc(aCard.value) + '</div>' +
+      body +
+      '<div class="res-actions">' +
+        '<button class="btn primary" data-act="restart">再来一局</button>' +
+        '<button class="btn ghost" data-act="setup">换一组牌</button>' +
+      '</div>';
+
+    el.overlay.hidden = false;
+    state.phase = 'over';
+  }
+
+  function restart() {
+    startGame(state.values);
+  }
+
+  function backToSetup() {
+    el.overlay.hidden = true;
+    el.layout.hidden = true;
+    el.setup.hidden = false;
+    state.phase = 'setup';
+    state.batch = 0;
+    renderRounds();
+    buildSetupCards(state.values.length === TOTAL ? state.values : DEFAULTS);
+    updateCounter();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  /* ---------------- 设置页 ---------------- */
+
+  function setupInputs() {
+    return Array.prototype.slice.call(el.setupGrid.querySelectorAll('.sc-val'));
+  }
+
+  function buildSetupCards(vals) {
+    var html = '';
+    for (var i = 0; i < TOTAL; i++) {
+      var v = vals[i] || '';
+      html +=
+        '<div class="setup-card' + (i === TOTAL - 1 ? ' is-richest' : '') + '" style="--i:' + i + '">' +
+          '<span class="sc-index">' + (i + 1) + '</span>' +
+          '<div class="val sc-val ' + sizeClass(v) + '" contenteditable="true" role="textbox"' +
+            ' spellcheck="false" data-ph="—" aria-label="第 ' + (i + 1) + ' 张牌"></div>' +
+        '</div>';
+    }
+    el.setupGrid.innerHTML = html;
+    var inputs = setupInputs();
+    for (var j = 0; j < TOTAL; j++) inputs[j].textContent = vals[j] || '';
+  }
+
+  function readValues() {
+    return setupInputs().map(function (node) { return node.textContent.trim(); });
+  }
+
+  function caretToEnd(node) {
+    var range = document.createRange();
+    range.selectNodeContents(node);
+    range.collapse(false);
+    var sel = window.getSelection();
+    if (!sel) return;
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+
+  function syncSetupSize(input) {
+    input.classList.remove('xl', 'md', 'sm');
+    input.classList.add(sizeClass(input.textContent.trim()));
+  }
+
+  function updateCounter() {
+    var n = readValues().filter(function (v) { return v; }).length;
+    el.counter.textContent = n + ' / ' + TOTAL + (n === TOTAL ? '' : ' · 还差 ' + (TOTAL - n) + ' 张');
+    el.counter.classList.toggle('bad', n !== TOTAL);
+    el.startBtn.disabled = n !== TOTAL;
+  }
+
+  /* ---------------- 事件 ---------------- */
+
+  el.setupGrid.addEventListener('input', function (e) {
+    var input = e.target.closest ? e.target.closest('.sc-val') : null;
+    if (!input) return;
+    syncSetupSize(input);
+    updateCounter();
+  });
+
+  el.setupGrid.addEventListener('keydown', function (e) {
+    var input = e.target.closest('.sc-val');
+    if (!input) return;
+    if (e.isComposing || e.keyCode === 229) return;
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      var inputs = setupInputs();
+      var next = inputs[inputs.indexOf(input) + 1];
+      if (next) { next.focus(); caretToEnd(next); }
+      else input.blur();
+    } else if (e.key === 'Escape') {
+      input.blur();
+    }
+  });
+
+  el.setupGrid.addEventListener('click', function (e) {
+    var card = e.target.closest('.setup-card');
+    if (!card || e.target.classList.contains('sc-val')) return;
+    var input = card.querySelector('.sc-val');
+    input.focus();
+    caretToEnd(input);
+  });
+
+  el.setupGrid.addEventListener('paste', function (e) {
+    var input = e.target.closest('.sc-val');
+    if (!input) return;
+    var data = e.clipboardData || window.clipboardData;
+    if (!data) return;
+    var text = data.getData('text');
+    if (!text) return;
+    e.preventDefault();
+    var parts = text.split(/\r?\n/).map(function (s) { return s.trim(); })
+      .filter(function (s) { return s.length > 0; });
+    if (!parts.length) return;
+    var inputs = setupInputs();
+    var start = inputs.indexOf(input);
+    for (var k = 0; k < parts.length && start + k < TOTAL; k++) {
+      inputs[start + k].textContent = parts[k];
+      syncSetupSize(inputs[start + k]);
+    }
+    updateCounter();
+    var next = inputs[Math.min(start + parts.length, TOTAL - 1)];
+    next.focus();
+    caretToEnd(next);
+  });
+
+  el.startBtn.addEventListener('click', function () {
+    var values = readValues();
+    if (values.length !== TOTAL || values.some(function (v) { return !v; })) return;
+    beginGame(values);
+  });
+
+  el.board.addEventListener('click', function (e) {
+    var card = e.target.closest('.card');
+    if (!card) return;
+    var i = Number(card.dataset.i);
+    if (state.phase === 'pickA') pickABase(i);
+    else if (state.phase === 'reveal') flipCard(i);
+  });
+
+  el.panel.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-act]');
+    if (!btn) return;
+    var act = btn.dataset.act;
+    if (act === 'bid') submitBid();
+    else if (act === 'accept') accept();
+    else if (act === 'reject') reject();
+    else if (act === 'restart') restart();
+    else if (act === 'setup') backToSetup();
+  });
+
+  el.panel.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && e.target && e.target.id === 'bidInput') {
+      e.preventDefault();
+      submitBid();
+    }
+  });
+
+  el.result.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-act]');
+    if (!btn) return;
+    if (btn.dataset.act === 'restart') restart();
+    else if (btn.dataset.act === 'setup') backToSetup();
+  });
+
+  /* ---------------- 启动 ---------------- */
+
+  buildSetupCards(DEFAULTS);
+  updateCounter();
+  renderRounds();
+})();
+</script>
+</body>
+</html>
